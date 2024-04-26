@@ -1,24 +1,20 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+// App.tsx
+
+import DocumentUpload from './views/DocumentUpload';
+import { ToastContainer } from 'react-toastify';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded shadow-lg">
+        <h1 className="text-xl font-semibold ">James Chase Consulting</h1>
+        <p className='mb-4 underline'>JavaScript Technical Exercise</p>
+
+        <DocumentUpload />
+        <ToastContainer />
+
+        <p className='text-xs text-center mt-12'>Prepared By: Adetayo TAIWO</p>
+      </div>
     </div>
   );
 }
