@@ -1,108 +1,109 @@
 // DocumentUpload.tsx
 
-import { useState, ChangeEvent, useEffect } from 'react'
+import { useState, ChangeEvent } from 'react'
 import { makePOST, makeREQUEST } from '../api-services/_config.services';
 import { tinyAlert } from '../utils';
 
 function DocumentUpload() {
 
-    // component states
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [presignedKey, setPresignedKey] = useState<string>("");
-    // const [presignedURL, setPresignedURL] = useState<string>("");
-    const [isUploaded, setIsUploaded] = useState<boolean>(false);
-    const [taskID, setTaskID] = useState<string>("");
+    // component local states
+    const [selectedFiles, setSelectedFiles] =  useState<File[]>([]);
+    const [selectedFilesStatus, setSelectedFilesStatus] =  useState<String[]>([]);
 
-
-    useEffect(() => { 
-        if(isUploaded){
-            StartProcessing();
-        }
-    }, [isUploaded]);
-
-    useEffect(() => { 
-        if(!!taskID)
-            CheckStatus();
-    }, [taskID]);
-
-
-    // handle file change for upload logic
+    //handles files selection from machine directory
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            setSelectedFile(e.target.files[0]);
+            const filesArray: FileList | null = e.target.files;
+            const files: File[] = Array.from(filesArray); // Convert FileList to Array
+            setSelectedFiles(files);
         }
     };
 
+    const test = () => {
+        // Create a new array to avoid mutating the state directly
+        let updatedStatus = [...selectedFilesStatus];
+    
+        for(let i = 0; i < selectedFiles.length; i++) {
+            updatedStatus[i] = 'start!';
+        }
+
+        console.log(updatedStatus);
+    
+        // Update the state only once after all changes
+        setSelectedFilesStatus(updatedStatus);
+    }
+
     //[step 1] request the presigned key && URL 
-    const handleStage = () =>{
-        makeREQUEST('POST', 'https://wajesmarthrms.website/dragonfly_stage.php')
-        .then((res) => {
+    const handleStage = () => {
+        test(); //initate the progress state;
 
-            // print success message for Presigned URL in alert;
-            tinyAlert('success', 'Presigned URL available!');
+        for(let i = 0; i < selectedFiles.length; i++){
+            makeREQUEST('POST', 'dragonfly_stage.php')
+            .then((res) => {
+                const data = res.data;
+                const presigned_URL = data.url;
+                const presignedKey = data.key;
 
-            // store response in component state;
-            const data = res.data;
-            const presigned_URL = data.url;
-            setPresignedKey(data.key);
-            // setPresignedURL(data.url);
+                
+                let updatedStatus = [...selectedFilesStatus];
+                updatedStatus[i] = 'presigned URL available!'; 
+                setSelectedFilesStatus(updatedStatus);
 
-            UploadJPEGFILE(presigned_URL);
+                UploadJPEGFILE(presigned_URL, presignedKey, i);
 
-        })      
-        .catch((err) => {
-            console.log(err)
-            tinyAlert('error', err.message);
+            })      
+            .catch((err) => {
+                console.log(err)
+                tinyAlert('error', err.message);
 
-        })
-        .finally(() => {
-            console.log('do nothing')
-        });
+            })
+        }
+
     }
 
     //[step 2] upload file using the resigned URL
-    const UploadJPEGFILE= (presigned_URL:string) =>{
+    const UploadJPEGFILE= (presigned_URL:string, presignedKey:string, index:number) =>{
         const form: any = new FormData();
 
-        form.append('url', presigned_URL)
-        form.append('file', selectedFile)
+        form.append('url', presigned_URL);
+        form.append('file', selectedFiles[index]);
 
-        makePOST('https://wajesmarthrms.website/dragonfly_upload.php', form)
+        makePOST('dragonfly_upload.php', form)
         .then((res) => {
-            setIsUploaded(true)
+                            
+            let updatedStatus = [...selectedFilesStatus];
+            updatedStatus[index] = 'file sent!';
+            setSelectedFilesStatus(updatedStatus);
+            
+
+            StartProcessing(presignedKey, index);
         })      
         .catch((err) => {
             console.log(err)
             tinyAlert('error', err.message)
         })
-        .finally(() => {
-            console.log('do nothing')
-        });
     }
 
     //[step 3] process uploaded file
-    const StartProcessing = () =>{
+    const StartProcessing = (presignedKey:string, index:number) =>{
         // prepare post data
         
         const form: any = new FormData();
+        form.append('key', presignedKey);
 
-        form.append('key', presignedKey)
-
-        // console.log(presignedKey, 'key')
-
-        // const data = {
-        //     "key": presignedKey,
-        // }
-
-        makeREQUEST('POST', 'https://wajesmarthrms.website/dragonfly_process.php', form)
+        makeREQUEST('POST', 'dragonfly_process.php', form)
         .then((res) => {
 
             // print success message for Presigned URL in alert;
-            tinyAlert('success', 'Presigned URL available!');
-
+            // tinyAlert('success', 'Processing');
+                                        
+            let updatedStatus = [...selectedFilesStatus];
+            updatedStatus[index] = 'processing...';
+            setSelectedFilesStatus(updatedStatus);
+            
             // store response in component state;
             const data = res.data
-            setTaskID(data.taskId);
+            CheckStatus(data.taskId, index);
 
         })      
         .catch((err) => {
@@ -110,25 +111,35 @@ function DocumentUpload() {
             tinyAlert('error', err.message);
 
         })
-        .finally(() => {
-            console.log('do nothing')
-        });
             
     }
 
     //[step 4] check upload status
-    const CheckStatus = () =>{
+    const CheckStatus = (taskID:string, index:number) =>{
         // prepare post data
         const data = {
             "taskId": taskID,
         }
 
-        makeREQUEST('POST', 'https://wajesmarthrms.website/dragonfly_status.php', data)
+        makeREQUEST('POST', 'dragonfly_status.php', data)
         .then((res) => {
-            const data = res.data
+            const data = res.data;
 
             // print success message for Presigned URL in alert;
-            tinyAlert('success', data.message);
+            // tinyAlert('success', data.status);
+
+            let updatedStatus = [...selectedFilesStatus];
+            updatedStatus[index] = data.status;
+            setSelectedFilesStatus(updatedStatus);
+
+            // recheck status until status is SUCCESS
+            if(data.status === 'RUNNING'){
+
+                // setInterval(() => {
+                    CheckStatus(taskID, index);
+                // },10000)
+
+            }
 
         })      
         .catch((err) => {
@@ -136,15 +147,13 @@ function DocumentUpload() {
             tinyAlert('error', err.message);
 
         })
-        .finally(() => {
-            console.log('do nothing')
-        });
     }
 
 
     return (
         <div className="flex flex-col items-center justify-center mt-8">
-            {/* upload label area */}
+
+            {/* upload icon area */}
             <label htmlFor="fileInput" className="mb-4 cursor-pointer text-center">
                 <svg
                     className="w-12 h-12 text-gray-400 border-2 border-dashed border-gray-400 rounded-full p-3 ml-4"
@@ -162,41 +171,50 @@ function DocumentUpload() {
                 <span className="mt-2 text-base leading-normal text-gray-600">
                     Select a file
                 </span>
-
             </label>
 
-            {/* upload input:file accept image/jpeg only */}
+            {/* upload hidden input:file for label && accept image/jpeg only */}
             <input
                 id="fileInput"
                 type="file"
                 accept="image/jpeg"
                 className="hidden"
+                multiple
                 onChange={handleFileChange}
             />
 
-            {/* upload image handler */}
+            {selectedFiles.length > 0 && (
+                <div className="mt-4 text-sm text-gray-500 text-xs">
+                    {selectedFiles.map((file, index) => (
+                        <div key={index} className="flex justify-between gap-6">
+                            <span>{index + 1} {file.name} - {file.size / 1000} KB</span>
+                            <span>({selectedFilesStatus[index]})</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {JSON.stringify(selectedFilesStatus)}
+
+            {/* upload button; triggers workdlow when clicked */}
             <button
                 onClick={handleStage}
-                disabled={!selectedFile && !presignedKey}
+                disabled={!selectedFiles.length}
                 className={`${
-                    selectedFile
+                    !!selectedFiles.length
                     ? 'bg-blue-500 hover:bg-blue-600'
                     : 'bg-gray-300 cursor-not-allowed'
-                } text-white font-semibold py-2 px-4 rounded focus:outline-none focus:ring focus:ring-blue-300`}
+                } text-white font-semibold py-2 px-4 rounded focus:outline-none focus:ring focus:ring-blue-300 mt-6`}
             >
-                Upload
+                Upload Image
             </button>
 
-            {presignedKey}
-            
-            {/* show selected files here */}
-            {selectedFile && (
-            <p className="mt-4 text-sm text-gray-500">
-                {selectedFile.name} - {selectedFile.size / 1000} KB
-            </p>
-            )}
+
         </div>
-  );
+    );
 }
 
 export default DocumentUpload;
+
+//
+    // const [presignedURL, setPresignedURL] = useState<string>("");
