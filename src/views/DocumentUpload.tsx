@@ -19,24 +19,25 @@ function DocumentUpload() {
         }
     };
 
-    const test = () => {
+    const startProcess = () => {
         // Create a new array to avoid mutating the state directly
         let updatedStatus = [...selectedFilesStatus];
     
         for(let i = 0; i < selectedFiles.length; i++) {
-            updatedStatus[i] = 'start!';
+            updatedStatus[i] = 'START';
         }
 
-        console.log(updatedStatus);
+        console.log(updatedStatus, 'i see');
     
         // Update the state only once after all changes
         setSelectedFilesStatus(updatedStatus);
+
+        // call the state fn()
+        handleStage();
     }
 
     //[step 1] request the presigned key && URL 
     const handleStage = () => {
-        test(); //initate the progress state;
-
         for(let i = 0; i < selectedFiles.length; i++){
             makeREQUEST('POST', 'dragonfly_stage.php')
             .then((res) => {
@@ -46,7 +47,7 @@ function DocumentUpload() {
 
                 
                 let updatedStatus = [...selectedFilesStatus];
-                updatedStatus[i] = 'presigned URL available!'; 
+                updatedStatus[i] = 'PRESIGNED';
                 setSelectedFilesStatus(updatedStatus);
 
                 UploadJPEGFILE(presigned_URL, presignedKey, i);
@@ -194,11 +195,10 @@ function DocumentUpload() {
                 </div>
             )}
 
-            {JSON.stringify(selectedFilesStatus)}
 
             {/* upload button; triggers workdlow when clicked */}
             <button
-                onClick={handleStage}
+                onClick={startProcess}
                 disabled={!selectedFiles.length}
                 className={`${
                     !!selectedFiles.length
